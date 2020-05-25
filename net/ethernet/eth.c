@@ -84,8 +84,8 @@ __setup("ether=", netdev_boot_setup);
  * in here instead.
  */
 int eth_header(struct sk_buff *skb, struct net_device *dev,
-	       unsigned short type,
-	       const void *daddr, const void *saddr, unsigned int len)
+			   unsigned short type,
+			   const void *daddr, const void *saddr, unsigned int len)
 {
 	struct ethhdr *eth = skb_push(skb, ETH_HLEN);
 
@@ -102,7 +102,8 @@ int eth_header(struct sk_buff *skb, struct net_device *dev,
 		saddr = dev->dev_addr;
 	memcpy(eth->h_source, saddr, ETH_ALEN);
 
-	if (daddr) {
+	if (daddr)
+	{
 		memcpy(eth->h_dest, daddr, ETH_ALEN);
 		return ETH_HLEN;
 	}
@@ -111,7 +112,8 @@ int eth_header(struct sk_buff *skb, struct net_device *dev,
 	 *      Anyway, the loopback-device should never use this function...
 	 */
 
-	if (dev->flags & (IFF_LOOPBACK | IFF_NOARP)) {
+	if (dev->flags & (IFF_LOOPBACK | IFF_NOARP))
+	{
 		memset(eth->h_dest, 0, ETH_ALEN);
 		return ETH_HLEN;
 	}
@@ -135,15 +137,16 @@ int eth_rebuild_header(struct sk_buff *skb)
 	struct ethhdr *eth = (struct ethhdr *)skb->data;
 	struct net_device *dev = skb->dev;
 
-	switch (eth->h_proto) {
+	switch (eth->h_proto)
+	{
 #ifdef CONFIG_INET
 	case htons(ETH_P_IP):
 		return arp_find(eth->h_dest, skb);
 #endif
 	default:
 		printk(KERN_DEBUG
-		       "%s: unable to resolve type %X addresses.\n",
-		       dev->name, ntohs(eth->h_proto));
+			   "%s: unable to resolve type %X addresses.\n",
+			   dev->name, ntohs(eth->h_proto));
 
 		memcpy(eth->h_source, dev->dev_addr, ETH_ALEN);
 		break;
@@ -173,7 +176,7 @@ u32 eth_get_headlen(void *data, unsigned int len)
 
 	/* parse any remaining L2/L3 headers, check for L4 */
 	if (!skb_flow_dissect_flow_keys_buf(&keys, data, eth->h_proto,
-					    sizeof(*eth), len, flags))
+										sizeof(*eth), len, flags))
 		return max_t(u32, keys.control.thoff, sizeof(*eth));
 
 	/* parse for any L4 headers */
@@ -181,6 +184,14 @@ u32 eth_get_headlen(void *data, unsigned int len)
 }
 EXPORT_SYMBOL(eth_get_headlen);
 
+/**
+ * xj:NIC启动调用此函数确定sk_buffer的网络协议
+ * 1.设置skb->dev = dev
+ * 2.设置skb-pkt_type
+ * 3.根据skb中的mac头判断协议类型
+ * 	 1. 802.3
+ *   2. 802.2
+ */
 /**
  * eth_type_trans - determine the packet's protocol ID.
  * @skb: received socket data
@@ -199,7 +210,8 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	skb_pull_inline(skb, ETH_HLEN);
 	eth = eth_hdr(skb);
 
-	if (unlikely(is_multicast_ether_addr(eth->h_dest))) {
+	if (unlikely(is_multicast_ether_addr(eth->h_dest)))
+	{
 		if (ether_addr_equal_64bits(eth->h_dest, dev->broadcast))
 			skb->pkt_type = PACKET_BROADCAST;
 		else
@@ -214,9 +226,10 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	 *      seems to set IFF_PROMISC.
 	 */
 
-	else if (1 /*dev->flags&IFF_PROMISC */ ) {
+	else if (1 /*dev->flags&IFF_PROMISC */)
+	{
 		if (unlikely(!ether_addr_equal_64bits(eth->h_dest,
-						      dev->dev_addr)))
+											  dev->dev_addr)))
 			skb->pkt_type = PACKET_OTHERHOST;
 	}
 
@@ -274,8 +287,7 @@ int eth_header_cache(const struct neighbour *neigh, struct hh_cache *hh, __be16 
 	struct ethhdr *eth;
 	const struct net_device *dev = neigh->dev;
 
-	eth = (struct ethhdr *)
-	    (((u8 *) hh->hh_data) + (HH_DATA_OFF(sizeof(*eth))));
+	eth = (struct ethhdr *)(((u8 *)hh->hh_data) + (HH_DATA_OFF(sizeof(*eth))));
 
 	if (type == htons(ETH_P_802_3))
 		return -1;
@@ -297,11 +309,11 @@ EXPORT_SYMBOL(eth_header_cache);
  * Called by Address Resolution module to notify changes in address.
  */
 void eth_header_cache_update(struct hh_cache *hh,
-			     const struct net_device *dev,
-			     const unsigned char *haddr)
+							 const struct net_device *dev,
+							 const unsigned char *haddr)
 {
-	memcpy(((u8 *) hh->hh_data) + HH_DATA_OFF(sizeof(struct ethhdr)),
-	       haddr, ETH_ALEN);
+	memcpy(((u8 *)hh->hh_data) + HH_DATA_OFF(sizeof(struct ethhdr)),
+		   haddr, ETH_ALEN);
 }
 EXPORT_SYMBOL(eth_header_cache_update);
 
@@ -389,11 +401,11 @@ int eth_validate_addr(struct net_device *dev)
 EXPORT_SYMBOL(eth_validate_addr);
 
 const struct header_ops eth_header_ops ____cacheline_aligned = {
-	.create		= eth_header,
-	.parse		= eth_header_parse,
-	.rebuild	= eth_rebuild_header,
-	.cache		= eth_header_cache,
-	.cache_update	= eth_header_cache_update,
+	.create = eth_header,
+	.parse = eth_header_parse,
+	.rebuild = eth_rebuild_header,
+	.cache = eth_header_cache,
+	.cache_update = eth_header_cache_update,
 };
 
 /*
@@ -415,17 +427,16 @@ const struct header_ops eth_header_ops ____cacheline_aligned = {
  */
 void ether_setup(struct net_device *dev)
 {
-	dev->header_ops		= &eth_header_ops;
-	dev->type		= ARPHRD_ETHER;
-	dev->hard_header_len 	= ETH_HLEN;
-	dev->mtu		= ETH_DATA_LEN;
-	dev->addr_len		= ETH_ALEN;
-	dev->tx_queue_len	= DEFAULT_TX_QUEUE_LEN;
-	dev->flags		= IFF_BROADCAST|IFF_MULTICAST;
-	dev->priv_flags		|= IFF_TX_SKB_SHARING;
+	dev->header_ops = &eth_header_ops;
+	dev->type = ARPHRD_ETHER;
+	dev->hard_header_len = ETH_HLEN;
+	dev->mtu = ETH_DATA_LEN;
+	dev->addr_len = ETH_ALEN;
+	dev->tx_queue_len = DEFAULT_TX_QUEUE_LEN;
+	dev->flags = IFF_BROADCAST | IFF_MULTICAST;
+	dev->priv_flags |= IFF_TX_SKB_SHARING;
 
 	memset(dev->broadcast, 0xFF, ETH_ALEN);
-
 }
 EXPORT_SYMBOL(ether_setup);
 
@@ -440,8 +451,8 @@ EXPORT_SYMBOL(ether_setup);
 void ether_setup_rh(struct net_device *dev)
 {
 	ether_setup(dev);
-	dev->extended->min_mtu	= ETH_MIN_MTU;
-	dev->extended->max_mtu	= ETH_DATA_LEN;
+	dev->extended->min_mtu = ETH_MIN_MTU;
+	dev->extended->max_mtu = ETH_DATA_LEN;
 }
 EXPORT_SYMBOL(ether_setup_rh);
 
@@ -464,10 +475,10 @@ EXPORT_SYMBOL(ether_setup_rh);
  */
 
 struct net_device *alloc_etherdev_mqs_rh(int sizeof_priv, unsigned int txqs,
-					 unsigned int rxqs)
+										 unsigned int rxqs)
 {
 	return alloc_netdev_mqs(sizeof_priv, "eth%d", ether_setup_rh, txqs,
-				rxqs);
+							rxqs);
 }
 EXPORT_SYMBOL(alloc_etherdev_mqs_rh);
 
@@ -476,7 +487,7 @@ EXPORT_SYMBOL(alloc_etherdev_mqs_rh);
  * against RHEL-7.4 and older.
  */
 struct net_device *alloc_etherdev_mqs(int sizeof_priv, unsigned int txqs,
-				      unsigned int rxqs)
+									  unsigned int rxqs)
 {
 	return alloc_netdev_mqs(sizeof_priv, "eth%d", ether_setup, txqs, rxqs);
 }
@@ -488,7 +499,7 @@ static void devm_free_netdev(struct device *dev, void *res)
 }
 
 struct net_device *devm_alloc_etherdev_mqs(struct device *dev, int sizeof_priv,
-					   unsigned int txqs, unsigned int rxqs)
+										   unsigned int txqs, unsigned int rxqs)
 {
 	struct net_device **dr;
 	struct net_device *netdev;
@@ -498,7 +509,8 @@ struct net_device *devm_alloc_etherdev_mqs(struct device *dev, int sizeof_priv,
 		return NULL;
 
 	netdev = alloc_etherdev_mqs(sizeof_priv, txqs, rxqs);
-	if (!netdev) {
+	if (!netdev)
+	{
 		devres_free(dr);
 		return NULL;
 	}
@@ -517,7 +529,7 @@ ssize_t sysfs_format_mac(char *buf, const unsigned char *addr, int len)
 EXPORT_SYMBOL(sysfs_format_mac);
 
 struct sk_buff **eth_gro_receive(struct sk_buff **head,
-				 struct sk_buff *skb)
+								 struct sk_buff *skb)
 {
 	struct sk_buff *p, **pp = NULL;
 	struct ethhdr *eh, *eh2;
@@ -529,7 +541,8 @@ struct sk_buff **eth_gro_receive(struct sk_buff **head,
 	off_eth = skb_gro_offset(skb);
 	hlen = off_eth + sizeof(*eh);
 	eh = skb_gro_header_fast(skb, off_eth);
-	if (skb_gro_header_hard(skb, hlen)) {
+	if (skb_gro_header_hard(skb, hlen))
+	{
 		eh = skb_gro_header_slow(skb, hlen, off_eth);
 		if (unlikely(!eh))
 			goto out;
@@ -537,12 +550,14 @@ struct sk_buff **eth_gro_receive(struct sk_buff **head,
 
 	flush = 0;
 
-	for (p = *head; p; p = p->next) {
+	for (p = *head; p; p = p->next)
+	{
 		if (!NAPI_GRO_CB(p)->same_flow)
 			continue;
 
 		eh2 = (struct ethhdr *)(p->data + off_eth);
-		if (compare_ether_header(eh, eh2)) {
+		if (compare_ether_header(eh, eh2))
+		{
 			NAPI_GRO_CB(p)->same_flow = 0;
 			continue;
 		}
@@ -552,7 +567,8 @@ struct sk_buff **eth_gro_receive(struct sk_buff **head,
 
 	rcu_read_lock();
 	ptype = gro_find_receive_by_type(type);
-	if (ptype == NULL) {
+	if (ptype == NULL)
+	{
 		flush = 1;
 		goto out_unlock;
 	}
@@ -584,7 +600,7 @@ int eth_gro_complete(struct sk_buff *skb, int nhoff)
 	ptype = gro_find_complete_by_type(type);
 	if (ptype != NULL)
 		err = ptype->callbacks.gro_complete(skb, nhoff +
-						    sizeof(struct ethhdr));
+													 sizeof(struct ethhdr));
 
 	rcu_read_unlock();
 	return err;
@@ -609,7 +625,7 @@ static int __init eth_offload_init(void)
 
 fs_initcall(eth_offload_init);
 
-unsigned char * __weak arch_get_platform_mac_address(void)
+unsigned char *__weak arch_get_platform_mac_address(void)
 {
 	return NULL;
 }

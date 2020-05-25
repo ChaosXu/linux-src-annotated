@@ -7967,6 +7967,9 @@ static void igb_ring_irq_enable(struct igb_q_vector *q_vector)
 }
 
 /**
+ * xj:NAPI的poll回调函数
+ * /
+/**
  *  igb_poll - NAPI Rx polling callback
  *  @napi: napi polling structure
  *  @budget: count of how many packets we should handle
@@ -7987,7 +7990,7 @@ static int igb_poll(struct napi_struct *napi, int budget)
 		clean_complete = igb_clean_tx_irq(q_vector, budget);
 
 	if (q_vector->rx.ring)
-	{
+	{ //xj:完成packet读取，清除rx中断
 		int cleaned = igb_clean_rx_irq(q_vector, budget);
 
 		work_done += cleaned;
@@ -8282,6 +8285,7 @@ static void igb_add_rx_frag(struct igb_ring *rx_ring,
 #endif
 }
 
+//xj:构造sk_buffer
 static struct sk_buff *igb_construct_skb(struct igb_ring *rx_ring,
 										 struct igb_rx_buffer *rx_buffer,
 										 union e1000_adv_rx_desc *rx_desc,
@@ -8544,7 +8548,7 @@ static void igb_process_skb_fields(struct igb_ring *rx_ring,
 	}
 
 	skb_record_rx_queue(skb, rx_ring->queue_index);
-
+	//xj:设置skb的网络协议
 	skb->protocol = eth_type_trans(skb, rx_ring->netdev);
 }
 
@@ -8595,6 +8599,11 @@ static void igb_put_rx_buffer(struct igb_ring *rx_ring,
 	rx_buffer->page = NULL;
 }
 
+/* xj:
+1. 构造skb,
+2. skb加入rx_buffer
+3. rx_buffer加入rx_ring
+*/
 static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 {
 	struct igb_ring *rx_ring = q_vector->rx.ring;
@@ -8662,9 +8671,10 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		/* probably a little skewed due to removing CRC */
 		total_bytes += skb->len;
 
+		//xj:这里会设置skb->protocol
 		/* populate checksum, timestamp, VLAN, and protocol */
 		igb_process_skb_fields(rx_ring, rx_desc, skb);
-
+		//xj:调用netdev模块的napi_gro_receive，处理读取的sk_buffer
 		napi_gro_receive(&q_vector->napi, skb);
 
 		/* reset skb pointer */

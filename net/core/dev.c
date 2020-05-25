@@ -1961,6 +1961,7 @@ static inline int deliver_skb(struct sk_buff *skb,
 	if (unlikely(skb_orphan_frags(skb, GFP_ATOMIC)))
 		return -ENOMEM;
 	atomic_inc(&skb->users);
+	//xj:调用net/ipv4/af_inet.c模块注册的ip_rcv函数（由inet_init函数注册）
 	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
 
@@ -4260,6 +4261,7 @@ static bool skb_pfmemalloc_protocol(struct sk_buff *skb)
 	}
 }
 
+//xj:协议栈处理核心函数
 static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -4304,6 +4306,7 @@ another_round:
 	list_for_each_entry_rcu(ptype, &ptype_all, list)
 	{
 		if (pt_prev)
+			//xj:如果有AF_PACKET tap设备，比如tcpdump(libcap)注册的,copy给他（net/packet/af_packet.c）
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 		pt_prev = ptype;
 	}
@@ -4311,6 +4314,7 @@ another_round:
 	list_for_each_entry_rcu(ptype, &skb->dev->extended->ptype_all, list)
 	{
 		if (pt_prev)
+			//xj:如果有AF_PACKET tap设备，比如tcpdump(libcap)注册的,copy给他（net/packet/af_packet.c）
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 		pt_prev = ptype;
 	}
@@ -4341,7 +4345,7 @@ skip_classify:
 		else if (unlikely(!skb))
 			goto out;
 	}
-
+	//xj:获取rx_handler
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
 	if (rx_handler)
 	{
@@ -4350,6 +4354,7 @@ skip_classify:
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 			pt_prev = NULL;
 		}
+		//xj:调用rx_handler
 		switch (rx_handler(&skb))
 		{
 		case RX_HANDLER_CONSUMED:
@@ -4376,22 +4381,22 @@ skip_classify:
 		 */
 		skb->vlan_tci = 0;
 	}
-
+	//xj:获取skb的协议类型，然后传送给协议栈处理
 	type = skb->protocol;
 
 	/* deliver only exact match when indicated */
 	if (likely(!deliver_exact))
-	{
+	{ //xj:传送给协议栈处理
 		deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
 							   &ptype_base[ntohs(type) &
 										   PTYPE_HASH_MASK]);
 	}
-
-	deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
+	//xj:传送给协议栈处理
+	deliver_ptype_list_skb(sk b, &pt_prev, orig_dev, type,
 						   &orig_dev->extended->ptype_specific);
 
 	if (unlikely(skb->dev != orig_dev))
-	{
+	{ //xj:传送给协议栈处理
 		deliver_ptype_list_skb(skb, &pt_prev, orig_dev, type,
 							   &skb->dev->extended->ptype_specific);
 	}
@@ -4439,6 +4444,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 		 * context down to all allocation sites.
 		 */
 		current->flags |= PF_MEMALLOC;
+		//xj:协议栈处理核心函数
 		ret = __netif_receive_skb_core(skb, true);
 		tsk_restore_flags(current, pflags, PF_MEMALLOC);
 	}
@@ -4448,6 +4454,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	return ret;
 }
 
+//xj:协议栈处理
 static int netif_receive_skb_internal(struct sk_buff *skb)
 {
 	int ret;
@@ -4460,19 +4467,21 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
 	rcu_read_lock();
 
 #ifdef CONFIG_RPS
+	//xj:启用RPS
 	if (static_key_false(&rps_needed))
 	{
 		struct rps_dev_flow voidflow, *rflow = &voidflow;
 		int cpu = get_rps_cpu(skb->dev, skb, &rflow);
 
 		if (cpu >= 0)
-		{
+		{ //xj:使用CPU backlog
 			ret = enqueue_to_backlog(skb, cpu, &rflow->last_qtail);
 			rcu_read_unlock();
 			return ret;
 		}
 	}
 #endif
+	//xj:这里进入协议栈处理
 	ret = __netif_receive_skb(skb);
 	rcu_read_unlock();
 	return ret;
@@ -4667,10 +4676,12 @@ static void gro_pull_from_frag0(struct sk_buff *skb, int grow)
 	}
 }
 
+//xj:GRO策略的数据包接收逻辑,由napi_gro_receive调用
 static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 {
 	struct sk_buff **pp = NULL;
 	struct packet_offload *ptype;
+	//xj:skb->protocol由网卡驱动设置
 	__be16 type = skb->protocol;
 	struct list_head *head = &offload_base;
 	int same_flow;
@@ -4678,6 +4689,12 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 	int grow;
 
 	if (!(skb->dev->features & NETIF_F_GRO))
+		/**
+		 * xj:
+		 * GRO模式继续，否则跳转normal模式
+		 * 注意，如果linux作为转发设备GRO反而降性能？
+		 *
+		 */
 		goto normal;
 
 	gro_list_prepare(napi, skb);
@@ -4714,7 +4731,7 @@ static enum gro_result dev_gro_receive(struct napi_struct *napi, struct sk_buff 
 			NAPI_GRO_CB(skb)->csum_cnt = 0;
 			NAPI_GRO_CB(skb)->csum_valid = 0;
 		}
-
+		//xj:调用skb关联的协议类型的gro_receive
 		pp = ptype->callbacks.gro_receive(&napi->gro_list, skb);
 		break;
 	}
@@ -4822,6 +4839,7 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 	switch (ret)
 	{
 	case GRO_NORMAL:
+		//xj:通知协议栈处理skb
 		if (netif_receive_skb_internal(skb))
 			ret = GRO_DROP;
 		break;
@@ -4845,6 +4863,7 @@ static gro_result_t napi_skb_finish(gro_result_t ret, struct sk_buff *skb)
 	return ret;
 }
 
+//xj:NIC驱动从内存读取packet并转成成sk_buff后调用此函数处理读取的packet
 gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 {
 	trace_napi_gro_receive_entry(skb);
@@ -4852,7 +4871,9 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 	skb_mark_napi_id(skb, napi);
 
 	skb_gro_reset_offset(skb);
-
+	//xj:
+	//1. 调用dev_gro_receive合并skb
+	//2. 调用napi_skb_finish通知协议栈处理
 	return napi_skb_finish(dev_gro_receive(napi, skb), skb);
 }
 EXPORT_SYMBOL(napi_gro_receive);
@@ -5530,6 +5551,9 @@ void netif_napi_del(struct napi_struct *napi)
 }
 EXPORT_SYMBOL(netif_napi_del);
 
+/**
+ * xj:调用网卡驱动注册的packet poll函数从内存获取网卡原始包
+ */
 static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 {
 	void *have;
@@ -5550,6 +5574,7 @@ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 	work = 0;
 	if (test_bit(NAPI_STATE_SCHED, &n->state))
 	{
+		//xj:调用napi结构的poll函数。poll函数由NIC驱动注册。比如igb_poll
 		work = n->poll(n, weight);
 		trace_napi_poll(n);
 	}
@@ -5596,6 +5621,7 @@ out_unlock:
 	return work;
 }
 
+//xj:网络数据包接收软中断处理，netdev模式初始化时注册。
 static void net_rx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
@@ -5620,6 +5646,7 @@ static void net_rx_action(struct softirq_action *h)
 		}
 
 		n = list_first_entry(&list, struct napi_struct, poll_list);
+		//xj:调用napi_poll从网卡取数据
 		budget -= napi_poll(n, &repoll);
 
 		/* If softirq window is exhausted then punt.
