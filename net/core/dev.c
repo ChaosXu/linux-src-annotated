@@ -402,7 +402,7 @@ static inline struct list_head *ptype_head(const struct packet_type *pt)
  *	guarantee all CPU's that are in middle of receiving packets
  *	will see the new packet type (until the next received packet).
  */
-
+//xj:添加数据包处理函数
 void dev_add_pack(struct packet_type *pt)
 {
 	struct list_head *head = ptype_head(pt);
@@ -2479,6 +2479,7 @@ int netif_get_num_default_rss_queues(void)
 }
 EXPORT_SYMBOL(netif_get_num_default_rss_queues);
 
+//xj:网络接口调度
 static inline void __netif_reschedule(struct Qdisc *q)
 {
 	struct softnet_data *sd;
@@ -2489,6 +2490,7 @@ static inline void __netif_reschedule(struct Qdisc *q)
 	q->next_sched = NULL;
 	*sd->output_queue_tailp = q;
 	sd->output_queue_tailp = &q->next_sched;
+	//xj:发起网络传输softirq，触发net_tx_action
 	raise_softirq_irqoff(NET_TX_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -3085,6 +3087,7 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_skb_features);
 
+//xj:发送一个skb
 static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 					struct netdev_queue *txq, bool more)
 {
@@ -3095,23 +3098,27 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 		dev_queue_xmit_nit(skb, dev);
 
 	len = skb->len;
+	//xj:netdev发送
 	rc = netdev_start_xmit(skb, dev, txq, more);
 	trace_net_dev_xmit(skb, rc, dev, len);
 
 	return rc;
 }
 
+//xj:硬件发送
 struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *dev,
 									struct netdev_queue *txq, int *ret)
 {
 	struct sk_buff *skb = first;
 	int rc = NETDEV_TX_OK;
 
+	//xj:遍历sk_buffer
 	while (skb)
 	{
 		struct sk_buff *next = skb->next;
 
 		skb->next = NULL;
+		//xj:发送一个skb
 		rc = xmit_one(skb, dev, txq, next != NULL);
 		if (unlikely(!dev_xmit_complete(rc)))
 		{
@@ -3269,6 +3276,7 @@ static void qdisc_pkt_len_init(struct sk_buff *skb)
 	}
 }
 
+//xj:终于，发送数据给硬件
 static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 								 struct net_device *dev,
 								 struct netdev_queue *txq)
@@ -3313,6 +3321,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				spin_unlock(&q->busylock);
 				contended = false;
 			}
+			//xj:排队规则执行
 			__qdisc_run(q);
 		}
 		else
@@ -3322,6 +3331,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 	}
 	else
 	{
+		//xj:发送数据入队
 		rc = q->enqueue(skb, q, &to_free) & NET_XMIT_MASK;
 		if (qdisc_run_begin(q))
 		{
@@ -3527,9 +3537,11 @@ struct netdev_queue *netdev_pick_tx(struct net_device *dev,
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
  */
+//xj:发送2层包
 int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 {
 	struct net_device *dev = skb->dev;
+	//xj:网络设备发送队列
 	struct netdev_queue *txq;
 	struct Qdisc *q;
 	int rc = -ENOMEM;
@@ -3542,7 +3554,7 @@ int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 	rcu_read_lock_bh();
 
 	skb_update_prio(skb);
-
+	//xj:queueing discipline排队规则
 	qdisc_pkt_len_init(skb);
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_EGRESS);
@@ -3569,6 +3581,7 @@ int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 	trace_net_dev_queue(skb);
 	if (q->enqueue)
 	{
+		//xj:终于开始发送了
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
 	}
@@ -4040,12 +4053,14 @@ int netif_rx_ni(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(netif_rx_ni);
 
+//xj:网络设备传输动作，通过softirq触发
 static void net_tx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
 	if (sd->completion_queue)
 	{
+		//xj:取走完成队列
 		struct sk_buff *clist;
 
 		local_irq_disable();
@@ -4053,6 +4068,7 @@ static void net_tx_action(struct softirq_action *h)
 		sd->completion_queue = NULL;
 		local_irq_enable();
 
+		//xj:遍历完成队列
 		while (clist)
 		{
 			struct sk_buff *skb = clist;
@@ -4077,6 +4093,7 @@ static void net_tx_action(struct softirq_action *h)
 	{
 		struct Qdisc *head;
 
+		//xj:取走输出队列
 		local_irq_disable();
 		head = sd->output_queue;
 		sd->output_queue = NULL;
@@ -4096,6 +4113,7 @@ static void net_tx_action(struct softirq_action *h)
 				smp_mb__before_clear_bit();
 				clear_bit(__QDISC_STATE_SCHED,
 						  &q->state);
+				//xj:运行优先级队列
 				qdisc_run(q);
 				spin_unlock(root_lock);
 			}
