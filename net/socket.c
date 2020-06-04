@@ -143,7 +143,7 @@ static const struct file_operations socket_file_ops = {
 	.llseek = no_llseek,
 	.aio_read = sock_aio_read,
 	.aio_write = sock_aio_write,
-	.poll = sock_poll,
+	.poll = sock_poll, //xj:select|poll调用
 	.unlocked_ioctl = sock_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = compat_sock_ioctl,
@@ -824,6 +824,7 @@ void __sock_recv_ts_and_drops(struct msghdr *msg, struct sock *sk,
 }
 EXPORT_SYMBOL_GPL(__sock_recv_ts_and_drops);
 
+//xj:接收消息
 static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 									   struct msghdr *msg, size_t size, int flags)
 {
@@ -838,6 +839,7 @@ static inline int __sock_recvmsg_nosec(struct kiocb *iocb, struct socket *sock,
 	return sock->ops->recvmsg(iocb, sock, msg, size, flags);
 }
 
+//xj:接收消息
 static inline int __sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 								 struct msghdr *msg, size_t size, int flags)
 {
@@ -958,6 +960,7 @@ static struct sock_iocb *alloc_sock_iocb(struct kiocb *iocb,
 	return siocb;
 }
 
+//xj:执行读取
 static ssize_t do_sock_read(struct msghdr *msg, struct kiocb *iocb,
 							struct file *file, const struct iovec *iov,
 							unsigned long nr_segs)
@@ -977,9 +980,11 @@ static ssize_t do_sock_read(struct msghdr *msg, struct kiocb *iocb,
 	msg->msg_iovlen = nr_segs;
 	msg->msg_flags = (file->f_flags & O_NONBLOCK) ? MSG_DONTWAIT : 0;
 
+	//xj:接收消息
 	return __sock_recvmsg(iocb, sock, msg, size, msg->msg_flags);
 }
 
+//xj:socket读取函数
 static ssize_t sock_aio_read(struct kiocb *iocb, const struct iovec *iov,
 							 unsigned long nr_segs, loff_t pos)
 {
@@ -1230,6 +1235,7 @@ static unsigned int sock_poll(struct file *file, poll_table *wait)
 			sk_busy_loop(sock->sk, 1);
 	}
 
+	//xj:进一步调用协议的操作
 	return busy_flag | sock->ops->poll(file, sock, wait);
 }
 

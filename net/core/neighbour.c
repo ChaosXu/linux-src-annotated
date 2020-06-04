@@ -316,7 +316,7 @@ EXPORT_SYMBOL(neigh_ifdown);
 static struct neighbour *neigh_alloc(struct neigh_table *tbl, struct net_device *dev)
 {
 	//xj:邻居信息
-	struct neighbour *n = NULL;
+	struct neighbbour *n = NULL;
 	unsigned long now = jiffies;
 	int entries;
 

@@ -811,6 +811,7 @@ ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset,
 }
 EXPORT_SYMBOL(inet_sendpage);
 
+//xj:面向流的消息接收
 int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 				 size_t size, int flags)
 {
@@ -820,6 +821,7 @@ int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 
 	sock_rps_record_flow(sk);
 
+	//xj:tcp协议的消息接收
 	err = sk->sk_prot->recvmsg(iocb, sk, msg, size, flags & MSG_DONTWAIT,
 							   flags & ~MSG_DONTWAIT, &addr_len);
 	if (err >= 0)
@@ -966,7 +968,7 @@ const struct proto_ops inet_stream_ops = {
 	.socketpair = sock_no_socketpair,
 	.accept = inet_accept,
 	.getname = inet_getname,
-	.poll = tcp_poll,
+	.poll = tcp_poll, //xj:select轮询调用
 	.ioctl = inet_ioctl,
 	.listen = inet_listen,
 	.shutdown = inet_shutdown,

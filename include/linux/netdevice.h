@@ -2939,11 +2939,12 @@ static inline int unregister_gifconf(unsigned int family)
 /*
  * Incoming packets are placed on per-cpu queues
  */
+//xj:网络软中断
 struct softnet_data
 {
-	struct Qdisc *output_queue;
+	struct Qdisc *output_queue; //xj:输出队列
 	struct Qdisc **output_queue_tailp;
-	struct list_head poll_list;
+	struct list_head poll_list; //xj:接收队列
 	struct sk_buff *completion_queue;
 	struct sk_buff_head process_queue;
 

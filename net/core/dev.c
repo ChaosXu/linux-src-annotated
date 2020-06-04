@@ -1965,6 +1965,7 @@ static inline int deliver_skb(struct sk_buff *skb,
 	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
 
+//xj:投递skb
 static inline void deliver_ptype_list_skb(struct sk_buff *skb,
 										  struct packet_type **pt,
 										  struct net_device *dev, __be16 type,
@@ -1974,6 +1975,7 @@ static inline void deliver_ptype_list_skb(struct sk_buff *skb,
 
 	list_for_each_entry_rcu(ptype, ptype_list, list)
 	{
+		//xj:查找协议类型，交付skb
 		if (ptype->type != type)
 			continue;
 		if (pt_prev)
@@ -3684,11 +3686,14 @@ int dev_weight_tx_bias __read_mostly = 1; /* bias for output_queue quota */
 int dev_rx_weight __read_mostly = 64;
 int dev_tx_weight __read_mostly = 64;
 
+//xj:调度接收
 /* Called with irq disabled */
 static inline void ____napi_schedule(struct softnet_data *sd,
 									 struct napi_struct *napi)
 {
+	//xj:设备加入poll_list
 	list_add_tail(&napi->poll_list, &sd->poll_list);
+	//xj:触发网络接收软中断
 	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 }
 
@@ -4351,6 +4356,7 @@ skip_classify:
 	if (pfmemalloc && !skb_pfmemalloc_protocol(skb))
 		goto drop;
 
+	//xj:vlan?
 	if (skb_vlan_tag_present(skb))
 	{
 		if (pt_prev)
@@ -4520,6 +4526,7 @@ static int netif_receive_skb_internal(struct sk_buff *skb)
  *	NET_RX_SUCCESS: no congestion
  *	NET_RX_DROP: packet was dropped
  */
+//xj:处理从rx_ring来的skb，这里进入内核网络协议栈
 int netif_receive_skb(struct sk_buff *skb)
 {
 	trace_netif_receive_skb_entry(skb);
@@ -5152,11 +5159,13 @@ static int process_backlog(struct napi_struct *napi, int quota)
  * The entry's receive function will be scheduled to run.
  * Consider using __napi_schedule_irqoff() if hard irqs are masked.
  */
+//xj:包裹函数，保存与恢复硬件中断
 void __napi_schedule(struct napi_struct *n)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
+	//xj:调度接收
 	____napi_schedule(this_cpu_ptr(&softnet_data), n);
 	local_irq_restore(flags);
 }
@@ -5642,6 +5651,7 @@ out_unlock:
 //xj:网络数据包接收软中断处理，netdev模式初始化时注册。
 static void net_rx_action(struct softirq_action *h)
 {
+	//xj:获取当前cpu的软中断
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 	unsigned long time_limit = jiffies + 2;
 	int budget = netdev_budget;
@@ -5663,6 +5673,7 @@ static void net_rx_action(struct softirq_action *h)
 			break;
 		}
 
+		//xj:从poll_list取出网络包到达的设备
 		n = list_first_entry(&list, struct napi_struct, poll_list);
 		//xj:调用napi_poll从网卡取数据
 		budget -= napi_poll(n, &repoll);
@@ -9139,6 +9150,7 @@ static struct pernet_operations __net_initdata default_device_ops = {
  *       This is called single threaded during boot, so no need
  *       to take the rtnl semaphore.
  */
+//xj:网络设备模块初始化
 static int __init net_dev_init(void)
 {
 	int i, rc = -ENOMEM;
@@ -9205,6 +9217,7 @@ static int __init net_dev_init(void)
 	if (register_pernet_device(&default_device_ops))
 		goto out;
 
+	//xj:注册软中断处理例程
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action);
 

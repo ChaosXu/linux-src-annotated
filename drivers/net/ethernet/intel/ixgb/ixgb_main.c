@@ -203,8 +203,10 @@ ixgb_irq_enable(struct ixgb_adapter *adapter)
 	IXGB_WRITE_FLUSH(&adapter->hw);
 }
 
+//xj:启用设备
 int ixgb_up(struct ixgb_adapter *adapter)
 {
+	//xj:取得网络设备
 	struct net_device *netdev = adapter->netdev;
 	int err, irq_flags = IRQF_SHARED;
 	int max_frame = netdev->mtu + ENET_HEADER_SIZE + ENET_FCS_LENGTH;
@@ -237,6 +239,7 @@ int ixgb_up(struct ixgb_adapter *adapter)
 		/* proceed to try to request regular interrupt */
 	}
 
+	//xj:注册硬件中断
 	err = request_irq(adapter->pdev->irq, ixgb_intr, irq_flags,
 					  netdev->name, netdev);
 	if (err)
@@ -399,7 +402,7 @@ static const struct net_device_ops ixgb_netdev_ops = {
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
  **/
-
+//xj:驱动初始化
 static int
 ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
@@ -443,6 +446,7 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_master(pdev);
 
+	//xj:创建代表网卡的网络设备
 	netdev = alloc_etherdev(sizeof(struct ixgb_adapter));
 	if (!netdev)
 	{
@@ -450,9 +454,11 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_alloc_etherdev;
 	}
 
+	//xj:将网络设备的父设备设置为pci->dev设备
 	SET_NETDEV_DEV(netdev, &pdev->dev);
-
+	//xj:设置pdev的驱动数据为netdev
 	pci_set_drvdata(pdev, netdev);
+	//xj:创建适配器
 	adapter = netdev_priv(netdev);
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
@@ -476,10 +482,11 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			break;
 		}
 	}
-
+	//xj:网络设备操作
 	netdev->netdev_ops = &ixgb_netdev_ops;
 	ixgb_set_ethtool_ops(netdev);
 	netdev->watchdog_timeo = 5 * HZ;
+	//xj:向napi注册一个轮询函数
 	netif_napi_add(netdev, &adapter->napi, ixgb_clean, 64);
 
 	strncpy(netdev->name, pci_name(pdev), sizeof(netdev->name) - 1);
@@ -651,10 +658,11 @@ ixgb_sw_init(struct ixgb_adapter *adapter)
  * handler is registered with the OS, the watchdog timer is started,
  * and the stack is notified that the interface is ready.
  **/
-
+//xj:网卡被激活的时候调用
 static int
 ixgb_open(struct net_device *netdev)
 {
+	//xj:转换成适配器，讨论
 	struct ixgb_adapter *adapter = netdev_priv(netdev);
 	int err;
 
@@ -671,6 +679,7 @@ ixgb_open(struct net_device *netdev)
 	if (err)
 		goto err_setup_rx;
 
+	//xj:启用设备
 	err = ixgb_up(adapter);
 	if (err)
 		goto err_up;
@@ -1844,6 +1853,7 @@ void ixgb_update_stats(struct ixgb_adapter *adapter)
  * @data: pointer to a network interface device structure
  **/
 
+//xj:硬件中断调用此handler
 static irqreturn_t
 ixgb_intr(int irq, void *data)
 {
@@ -1867,6 +1877,7 @@ ixgb_intr(int irq, void *data)
 		*/
 
 		IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
+		//xj:napi调度
 		__napi_schedule(&adapter->napi);
 	}
 	return IRQ_HANDLED;
@@ -1876,7 +1887,7 @@ ixgb_intr(int irq, void *data)
  * ixgb_clean - NAPI Rx polling callback
  * @adapter: board private structure
  **/
-
+//xj:网卡注册的poll
 static int
 ixgb_clean(struct napi_struct *napi, int budget)
 {
@@ -1884,6 +1895,7 @@ ixgb_clean(struct napi_struct *napi, int budget)
 	int work_done = 0;
 
 	ixgb_clean_tx_irq(adapter);
+	//xj:接收
 	ixgb_clean_rx_irq(adapter, &work_done, budget);
 
 	/* If budget not fully consumed, exit the polling mode */
@@ -2062,7 +2074,7 @@ static void ixgb_check_copybreak(struct net_device *netdev,
  * ixgb_clean_rx_irq - Send received data up the network stack,
  * @adapter: board private structure
  **/
-
+//xj:将受到的数据发给网络协议栈
 static bool
 ixgb_clean_rx_irq(struct ixgb_adapter *adapter, int *work_done, int work_to_do)
 {
@@ -2141,6 +2153,7 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter, int *work_done, int work_to_do)
 			goto rxdesc_done;
 		}
 
+		//xj:将rx_ring中的数据复制到skb
 		ixgb_check_copybreak(netdev, buffer_info, length, &skb);
 
 		/* Good Receive */
@@ -2154,6 +2167,7 @@ ixgb_clean_rx_irq(struct ixgb_adapter *adapter, int *work_done, int work_to_do)
 			__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
 								   le16_to_cpu(rx_desc->special));
 
+		//xj:接收skb
 		netif_receive_skb(skb);
 
 	rxdesc_done:

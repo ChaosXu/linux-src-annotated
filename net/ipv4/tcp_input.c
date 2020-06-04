@@ -589,6 +589,7 @@ static inline void tcp_rcv_rtt_measure_ts(struct sock *sk,
  * This function should be called every time data is copied to user space.
  * It calculates the appropriate TCP receive buffer space.
  */
+//xj:调整tcp接收空间
 void tcp_rcv_space_adjust(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -4796,6 +4797,7 @@ err:
 	return -ENOMEM;
 }
 
+//xj:tcp数据队列
 static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -4818,11 +4820,14 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	 *  Packets in sequence go to the receive queue.
 	 *  Out of sequence packets to the out_of_order_queue.
 	 */
+	//xj:收到的网络包是待接收的下一个包
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt)
 	{
+		//xj:没有接受窗口
 		if (tcp_receive_window(tp) == 0)
 			goto out_of_window;
 
+		//xj:有用户进程正在等待读取
 		/* Ok. In sequence. In window. */
 		if (tp->ucopy.task == current &&
 			tp->copied_seq == tp->rcv_nxt && tp->ucopy.len &&
@@ -4834,6 +4839,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 			__set_current_state(TASK_RUNNING);
 
 			local_bh_enable();
+			//xj:复制给用户进程
 			if (!skb_copy_datagram_iovec(skb, 0, tp->ucopy.iov, chunk))
 			{
 				tp->ucopy.len -= chunk;
@@ -4854,8 +4860,10 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 				else if (tcp_try_rmem_schedule(sk, skb, skb->truesize))
 					goto drop;
 			}
+			//xj:未能复制给用户进程的包放入队列接收
 			eaten = tcp_queue_rcv(sk, skb, 0, &fragstolen);
 		}
+		//xj:更新应该接收的下一个包的序号
 		tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
 		if (skb->len)
 			tcp_event_data_recv(sk, skb);
@@ -4864,6 +4872,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 
 		if (!RB_EMPTY_ROOT(&tp->out_of_order_queue))
 		{
+			//xj:检查乱序队列的包能否放入接收队列
 			tcp_ofo_queue(sk);
 
 			/* RFC2581. 4.2. SHOULD send immediate ACK, when
@@ -4885,8 +4894,10 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 		return;
 	}
 
+	//xj:收到的最后一个网路包序号小于应当接收的网络包序号
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt))
 	{
+		//xj:之前已经收到过这个包，但是客户没有收到ack，立即发送一个ack
 		/* A retransmit, 2nd most common case.  Force an immediate ack. */
 		NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_DELAYEDACKLOST);
 		tcp_dsack_set(sk, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
@@ -4900,11 +4911,13 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	}
 
 	/* Out of window. F.e. zero window probe. */
+	//xj:收到的包的序号在接收窗口之外，客户太猛，服务端收不过来，通知客户重置发送窗口为0，重新开始协商
 	if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt + tcp_receive_window(tp)))
 		goto out_of_window;
 
 	tcp_enter_quickack_mode(sk);
 
+	//xj:收到的网络包小于下一个包
 	if (before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt))
 	{
 		/* Partial packet, seq < rcv_next < end_seq */
@@ -4914,6 +4927,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 
 		tcp_dsack_set(sk, TCP_SKB_CB(skb)->seq, tp->rcv_nxt);
 
+		//xj:重置接收窗口
 		/* If window is closed, drop tail of packet. But after
 		 * remembering D-SACK for its head made in previous line.
 		 */
@@ -4922,6 +4936,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 		goto queue_and_out;
 	}
 
+	//xj:乱序包加入乱序队列
 	tcp_data_queue_ofo(sk, skb);
 }
 
@@ -5792,6 +5807,7 @@ step5:
 	tcp_urg(sk, skb, th);
 
 	/* step 7: process the segment text */
+	//xj:进入队列处理
 	tcp_data_queue(sk, skb);
 
 	tcp_data_snd_check(sk);

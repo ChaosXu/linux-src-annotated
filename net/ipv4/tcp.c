@@ -437,6 +437,7 @@ EXPORT_SYMBOL(tcp_init_sock);
  *	take care of normal races (between the test and the event) and we don't
  *	go look at any of the socket buffers directly.
  */
+//xj:select轮询调用
 unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 {
 	unsigned int mask;
@@ -447,6 +448,7 @@ unsigned int tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 
 	sock_poll_wait(file, sk_sleep(sk), wait);
 	if (sk->sk_state == TCP_LISTEN)
+		//xj:sock当前是监听状态，调用监听轮询
 		return inet_csk_listen_poll(sk);
 
 	/* Socket is not locked. We are protected from async events
@@ -1662,7 +1664,7 @@ EXPORT_SYMBOL(tcp_read_sock);
  *	tricks with *seq access order and skb->users are not required.
  *	Probably, code can be easily improved even more.
  */
-
+//xj:tcp接收函数
 int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				size_t len, int nonblock, int flags, int *addr_len)
 {
@@ -1754,6 +1756,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_SYN)
 				offset--;
 			if (offset < skb->len)
+				//xj:找到数据包
 				goto found_ok_skb;
 			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
 				goto found_fin_ok;
@@ -1914,6 +1917,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		continue;
 
 	found_ok_skb:
+		//xj:找到数据包
 		/* Ok so how much can we use? */
 		used = skb->len - offset;
 		if (len < used)
@@ -1944,6 +1948,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 		if (!(flags & MSG_TRUNC))
 		{
+			//xj:复制数据包给用户
 			err = skb_copy_datagram_msg(skb, offset, msg, used);
 			if (err)
 			{
@@ -1991,6 +1996,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 			tp->ucopy.len = copied > 0 ? len : 0;
 
+			//xj:处理prequeue队列
 			tcp_prequeue_process(sk);
 
 			if (copied > 0 && (chunk = len - tp->ucopy.len) != 0)
@@ -2012,6 +2018,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	/* Clean up data we have read: This will do ACK frames. */
 	tcp_cleanup_rbuf(sk, copied);
 
+	//xj:处理backlog
 	release_sock(sk);
 	return copied;
 
@@ -2157,6 +2164,7 @@ void tcp_close(struct sock *sk, long timeout)
 		goto adjudge_to_death;
 	}
 
+	//xj:处理接收队列
 	/*  We need to flush the recv. buffs.  We do this only on the
 	 *  descriptor close, not protocol-sourced closes, because the
 	 *  reader process may not have drained the data yet!

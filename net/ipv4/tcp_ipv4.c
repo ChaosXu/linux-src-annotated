@@ -1545,7 +1545,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct sock *rsk;
 
-	//xj:已连接状态
+	//xj:当前是已连接状态
 	if (sk->sk_state == TCP_ESTABLISHED)
 	{ /* Fast path */
 		struct dst_entry *dst = sk->sk_rx_dst;
@@ -1568,7 +1568,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	if (skb->len < tcp_hdrlen(skb) || tcp_checksum_complete(skb))
 		goto csum_err;
 
-	//xj:监听状态
+	//xj:当前是监听状态,
 	if (sk->sk_state == TCP_LISTEN)
 	{
 		//xj:建立连接
@@ -1590,7 +1590,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	}
 	else
 		sock_rps_save_rxhash(sk, skb);
-
+	//xj:当前是其它状态
 	if (tcp_rcv_state_process(sk, skb, tcp_hdr(skb), skb->len))
 	{
 		rsk = sk;
@@ -1825,16 +1825,18 @@ process:
 	bh_lock_sock_nested(sk);
 	tcp_sk(sk)->segs_in += max_t(u16, 1, skb_shinfo(skb)->gso_segs);
 	ret = 0;
+
 	if (!sock_owned_by_user(sk))
 	{
+		//xj:未被用户锁定
 		if (!tcp_prequeue(sk, skb))
-			//xj:socket状态处理
+			//xj:根据socket状态处理收到的包
 			ret = tcp_v4_do_rcv(sk, skb);
 	}
-	//xj:加入backlog
 	else if (unlikely(sk_add_backlog(sk, skb,
 									 sk->sk_rcvbuf + sk->sk_sndbuf)))
 	{
+		//xj:加入backlog
 		bh_unlock_sock(sk);
 		NET_INC_STATS_BH(net, LINUX_MIB_TCPBACKLOGDROP);
 		goto discard_and_relse;
