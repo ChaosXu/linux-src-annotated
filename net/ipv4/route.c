@@ -1533,6 +1533,7 @@ static void rt_set_nexthop(struct rtable *rt, __be32 daddr,
 #endif
 }
 
+//xj:创建路由表
 static struct rtable *rt_dst_alloc(struct net_device *dev,
 								   unsigned int flags, u16 type,
 								   bool nopolicy, bool noxfrm, bool will_cache)
@@ -1557,6 +1558,7 @@ static struct rtable *rt_dst_alloc(struct net_device *dev,
 		rt->rt_uses_gateway = 0;
 		INIT_LIST_HEAD(&rt->rt_uncached);
 
+		//xj:设置IP输出函数
 		rt->dst.output = ip_output;
 		if (flags & RTCF_LOCAL)
 			rt->dst.input = ip_local_deliver;

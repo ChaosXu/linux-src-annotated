@@ -454,18 +454,25 @@ packet_routed:
 	/* OK, we know where to send it, allocate and build IP header. */
 	skb_push(skb, sizeof(struct iphdr) + (inet_opt ? inet_opt->opt.optlen : 0));
 	skb_reset_network_header(skb);
+	//xj:从skb中获取IP包头
 	iph = ip_hdr(skb);
 	*((__be16 *)iph) = htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
+
 	if (ip_dont_fragment(sk, &rt->dst) && !skb->ignore_df)
+		//xj:包大于MTU时，不允许分片
 		iph->frag_off = htons(IP_DF);
 	else
+		//xj:缺省允许分片
 		iph->frag_off = 0;
+	//xj:ttl存活时间，每一跳-1
 	iph->ttl = ip_select_ttl(inet, &rt->dst);
+	//xj:设置IP数据的使用的上层协议，从关联sock获取。比如TCP
 	iph->protocol = sk->sk_protocol;
+	//xj:IP包源目标地址
 	ip_copy_addrs(iph, fl4);
 
 	/* Transport layer set skb->h.foo itself. */
-
+	//xj:设置IP包options
 	if (inet_opt && inet_opt->opt.optlen)
 	{
 		iph->ihl += inet_opt->opt.optlen >> 2;
