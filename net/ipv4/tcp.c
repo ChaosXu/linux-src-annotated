@@ -1738,7 +1738,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		}
 
 		/* Next get a buffer. */
-
+		//xj:遍历接收队列
 		last = skb_peek_tail(&sk->sk_receive_queue);
 		skb_queue_walk(&sk->sk_receive_queue, skb)
 		{
@@ -1759,6 +1759,7 @@ int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				//xj:找到数据包
 				goto found_ok_skb;
 			if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
+				//xj:fin包
 				goto found_fin_ok;
 			WARN(!(flags & MSG_PEEK),
 				 "recvmsg bug 2: copied %X seq %X rcvnxt %X fl %X\n",
