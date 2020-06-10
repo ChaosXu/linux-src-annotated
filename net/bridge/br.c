@@ -38,7 +38,8 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 	int err;
 
 	/* register of bridge completed, add sysfs entries */
-	if ((dev->priv_flags & IFF_EBRIDGE) && event == NETDEV_REGISTER) {
+	if ((dev->priv_flags & IFF_EBRIDGE) && event == NETDEV_REGISTER)
+	{
 		br_sysfs_addbr(dev);
 		return NOTIFY_DONE;
 	}
@@ -50,7 +51,8 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 
 	br = p->br;
 
-	switch (event) {
+	switch (event)
+	{
 	case NETDEV_CHANGEMTU:
 		dev_set_mtu(br->dev, br_min_mtu(br));
 		break;
@@ -82,7 +84,8 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 		break;
 
 	case NETDEV_UP:
-		if (netif_running(br->dev) && netif_oper_up(dev)) {
+		if (netif_running(br->dev) && netif_oper_up(dev))
+		{
 			spin_lock_bh(&br->lock);
 			br_stp_enable_port(p);
 			spin_unlock_bh(&br->lock);
@@ -111,7 +114,7 @@ static int br_device_event(struct notifier_block *unused, unsigned long event, v
 
 	/* Events that may cause spanning tree to refresh */
 	if (event == NETDEV_CHANGEADDR || event == NETDEV_UP ||
-	    event == NETDEV_CHANGE || event == NETDEV_DOWN)
+		event == NETDEV_CHANGE || event == NETDEV_DOWN)
 		br_ifinfo_notify(RTM_NEWLINK, p);
 
 	return NOTIFY_DONE;
@@ -123,7 +126,7 @@ static struct notifier_block br_device_notifier = {
 
 /* called with RTNL or RCU */
 static int br_switchdev_event(struct notifier_block *unused,
-			      unsigned long event, void *ptr)
+							  unsigned long event, void *ptr)
 {
 	struct net_device *dev = switchdev_notifier_info_to_dev(ptr);
 	struct net_bridge_port *p;
@@ -137,29 +140,31 @@ static int br_switchdev_event(struct notifier_block *unused,
 
 	br = p->br;
 
-	switch (event) {
+	switch (event)
+	{
 	case SWITCHDEV_FDB_ADD_TO_BRIDGE:
 		fdb_info = ptr;
 		err = br_fdb_external_learn_add(br, p, fdb_info->addr,
-						fdb_info->vid);
-		if (err) {
+										fdb_info->vid);
+		if (err)
+		{
 			err = notifier_from_errno(err);
 			break;
 		}
 		br_fdb_offloaded_set(br, p, fdb_info->addr,
-				     fdb_info->vid);
+							 fdb_info->vid);
 		break;
 	case SWITCHDEV_FDB_DEL_TO_BRIDGE:
 		fdb_info = ptr;
 		err = br_fdb_external_learn_del(br, p, fdb_info->addr,
-						fdb_info->vid);
+										fdb_info->vid);
 		if (err)
 			err = notifier_from_errno(err);
 		break;
 	case SWITCHDEV_FDB_OFFLOADED:
 		fdb_info = ptr;
 		br_fdb_offloaded_set(br, p, fdb_info->addr,
-				     fdb_info->vid);
+							 fdb_info->vid);
 		break;
 	}
 
@@ -177,21 +182,19 @@ static void __net_exit br_net_exit(struct net *net)
 	LIST_HEAD(list);
 
 	rtnl_lock();
-	for_each_netdev(net, dev)
-		if (dev->priv_flags & IFF_EBRIDGE)
-			br_dev_delete(dev, &list);
+	for_each_netdev(net, dev) if (dev->priv_flags & IFF_EBRIDGE)
+		br_dev_delete(dev, &list);
 
 	unregister_netdevice_many(&list);
 	rtnl_unlock();
-
 }
 
 static struct pernet_operations br_net_ops = {
-	.exit	= br_net_exit,
+	.exit = br_net_exit,
 };
 
 static const struct stp_proto br_stp_proto = {
-	.rcv	= br_stp_rcv,
+	.rcv = br_stp_rcv,
 };
 
 static int __init br_init(void)
@@ -201,35 +204,41 @@ static int __init br_init(void)
 	BUILD_BUG_ON(sizeof(struct br_input_skb_cb) > FIELD_SIZEOF(struct sk_buff, cb));
 
 	err = stp_proto_register(&br_stp_proto);
-	if (err < 0) {
+	if (err < 0)
+	{
 		pr_err("bridge: can't register sap for STP\n");
 		return err;
 	}
 
+	//xj:forward db
 	err = br_fdb_init();
 	if (err)
 		goto err_out;
-
+	//xj:netns ops
 	err = register_pernet_subsys(&br_net_ops);
 	if (err)
 		goto err_out1;
-
+	//xj:The implementation is empty ?
 	err = br_nf_core_init();
 	if (err)
 		goto err_out2;
 
+	//xj:netdevice notify chain
 	err = register_netdevice_notifier_rh(&br_device_notifier);
 	if (err)
 		goto err_out3;
 
+	//xj:The implementation is empty ?
 	err = register_switchdev_notifier(&br_switchdev_notifier);
 	if (err)
 		goto err_out4;
 
+	//xj:netlink
 	err = br_netlink_init();
 	if (err)
 		goto err_out5;
 
+	//xj:ioctl ops
 	brioctl_set(br_ioctl_deviceless_stub);
 
 #if IS_ENABLED(CONFIG_ATM_LANE)
@@ -238,8 +247,8 @@ static int __init br_init(void)
 
 #if IS_MODULE(CONFIG_BRIDGE_NETFILTER)
 	pr_info("bridge: filtering via arp/ip/ip6tables is no longer available "
-		"by default. Update your scripts to load br_netfilter if you "
-		"need this.\n");
+			"by default. Update your scripts to load br_netfilter if you "
+			"need this.\n");
 #endif
 
 	return 0;
@@ -278,7 +287,7 @@ static void __exit br_deinit(void)
 }
 
 module_init(br_init)
-module_exit(br_deinit)
-MODULE_LICENSE("GPL");
+	module_exit(br_deinit)
+		MODULE_LICENSE("GPL");
 MODULE_VERSION(BR_VERSION);
 MODULE_ALIAS_RTNL_LINK("bridge");

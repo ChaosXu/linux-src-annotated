@@ -4450,6 +4450,7 @@ out:
 	return ret;
 }
 
+//xj:硬件设备无关的数据数据接收处理入口
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	int ret;
